@@ -1,132 +1,158 @@
 const userModel = require("../models/userSchema");
 
-async function getAllUserController(req, res) {
+function formatUser(user){
+  return{
+    id: user._id,
+    username: user.username,
+    email: user.email,
+    profilePicture: user.profilePicture,
+    address: user.address,
+    phone: user.phone,
+    gender: user.gender,
+    dob: user.dob,
+    role: user.role,
+    isEmailVerified: user.isEmailVerified,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
+  }
+}
+
+const getAllUserController = async (req, res) => {
   try {
-    const loggedinUserId = req.user.id;
-    const loggedinUser = await userModel.findById(loggedinUserId);
+    const loggedinUserId = req.user.id
+    const loggedinUser = await userModel.findById(loggedinUserId)
+    const search = req.query.search ? req.query.search.trim() : ""
+    const role = req.query.role ? req.query.role.trim().toLowerCase() : ""
+    const page = Number(req.query.page) || 1
+    const limit = Number(req.query.limit) || 5
+    const skip = (page - 1) * limit
 
-    const users = await userModel.find({
-      _id: { $ne: loggedinUserId },
-    });
-
-    const userList = [];
-    for (let i = 0; i < users.length; i++) {
-      const u = users[i];
-      userList.push({
-        id: u._id,
-        username: u.username,
-        email: u.email,
-        profilePicture: u.profilePicture,
-        address: u.address,
-        phone: u.phone,
-        gender: u.gender,
-        dob: u.dob,
-        role: u.role,
-        status: u.status,
-        isEmailVerified: u.isEmailVerified,
-        createdAt: u.createdAt,
-        updatedAt: u.updatedAt,
-      });
+    const filter = {
+      _id: {$ne: loggedinUserId}
     }
 
-    res.status(200).json({
-      success: true,
-      message: "All users fetched successfully",
-      data: {
-        users: userList,
-        length: userList.length,
-      },
-      loggedinuser: loggedinUser,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
-    });
-  }
-}
+    if(role){
+      filter.role = role
+    }
+    
+    if(search){
+      const searchRegex = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      filter.$or = [
+        {username: {$regex: searchRegex, $options: "i"}},
+        {email: {$regex: searchRegex, $options: "i"}},
+        {role: {$regex: searchRegex, $options: "i"}}
+      ]
+    }
 
-async function getSingleUserController(req, res) {
-  const userId = req.params.id;
+    const totalUsers = await userModel.countDocuments(filter)
+    const totalPages = Math.ceil(totalUsers / limit)
+    const users = await userModel.find(filter).skip(skip).limit(limit)
+
+    
+    res.status(200).json({
+        success: true,
+        message: "Users get successfully",
+        data: {
+          users: users.map(formatUser),
+          length: users.length,
+          totalUsers: totalUsers,
+          currentPage: page,
+          totalPages: totalPages
+        },
+        loggedinuser: loggedinUser
+    })
+  } catch (error) {
+      res.send("catch error")
+  }
+};
+
+const getSingleUserController = async (req, res) => {
+  const userId = req.params.id
   try {
-    const user = await userModel.findOne({ _id: userId });
 
+    const user = await userModel.findOne({
+      _id: userId
+    })
     res.status(200).json({
-      success: true,
-      message: "Single user fetched successfully",
-      data: user,
-    });
+        success: true,
+        message: "User get successfully",
+        data: user,
+    })
   } catch (error) {
-    res.status(409).json({
-      success: false,
-      message: error.message,
-      userId: userId,
-    });
+      res.status(409).json({
+        success: false,
+        message: error.message,
+        userId: userId
+      })
   }
 }
 
-async function approvedUserController(req, res) {
+const approvedUserController = async (req, res) => {
+
   try {
     const updateUser = await userModel.findByIdAndUpdate(
       req.params.id,
       { status: true },
-      { new: true, runValidators: true }
+      {
+        new: true,
+        runValidators: true,
+      },
     );
 
     res.status(200).json({
       success: true,
-      message: "User approved successfully",
+      message: "User approved Successfully.",
       data: updateUser,
     });
   } catch (error) {
     res.status(409).json({
-      success: false,
-      message: error.message,
-    });
+        success: false,
+        message: error.message,
+      })
   }
 }
-
-async function deactiveUserController(req, res) {
+const deactiveUserController = async (req, res) => {
   try {
     const updateUser = await userModel.findByIdAndUpdate(
       req.params.id,
       { status: false },
-      { new: true, runValidators: true }
+      {
+        new: true,
+        runValidators: true,
+      },
     );
 
     res.status(200).json({
       success: true,
-      message: "User deactivated successfully",
+      message: "User deactive Successfully.",
       data: updateUser,
     });
   } catch (error) {
     res.status(409).json({
-      success: false,
-      message: error.message,
-    });
+        success: false,
+        message: error.message,
+      })
   }
 }
-
-async function deleteUserController(req, res) {
+const deleteUserController = async (req, res) => {
   try {
-    await userModel.findByIdAndDelete(req.params.id);
-
+    const deleteUser = await userModel.findByIdAndDelete(req.params.id);
     res.status(200).json({
       success: true,
-      message: "User deleted successfully",
+      message: "User delete Successfully.",
     });
   } catch (error) {
     res.status(409).json({
-      success: false,
-      message: error.message,
-    });
+        success: false,
+        message: error.message,
+      })
   }
 }
 
 module.exports = {
-  getAllUserController,
-  getSingleUserController,
-  approvedUserController,
-  deleteUserController,
-  deactiveUserController,
-};
+    getAllUserController,
+    getSingleUserController,
+    approvedUserController,
+    deleteUserController, 
+    deactiveUserController
+}
