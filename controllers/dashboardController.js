@@ -23,9 +23,12 @@ const getAllUserController = async (req, res) => {
     const loggedinUser = await userModel.findById(loggedinUserId)
     const search = req.query.search ? req.query.search.trim() : ""
     const role = req.query.role ? req.query.role.trim().toLowerCase() : ""
-    const page = Number(req.query.page) || 1
+    let page = Number(req.query.page) || 1
     const limit = Number(req.query.limit) || 5
-    const skip = (page - 1) * limit
+
+    if(page < 1){
+      page = 1
+    }
 
     const filter = {
       _id: {$ne: loggedinUserId}
@@ -46,6 +49,12 @@ const getAllUserController = async (req, res) => {
 
     const totalUsers = await userModel.countDocuments(filter)
     const totalPages = Math.ceil(totalUsers / limit)
+
+    if(totalPages > 0 && page > totalPages){
+      page = totalPages
+    }
+
+    const skip = (page - 1) * limit
     const users = await userModel.find(filter).skip(skip).limit(limit)
 
     
